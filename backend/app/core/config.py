@@ -24,6 +24,43 @@ class Settings(BaseSettings):
     HOST: str = Field(default="0.0.0.0", env="HOST")
     PORT: int = Field(default=8000, env="PORT")
     DEBUG: bool = Field(default=False, env="DEBUG")
+    
+    # Storage settings (JSON file storage)
+    STORAGE_FILE: str = Field(
+        default="data.json",
+        env="STORAGE_FILE"
+    )
+    
+    # Firecracker settings
+    FIRECRACKER_SOCKET_PATH: str = Field(
+        default="/tmp/firecracker.socket",
+        env="FIRECRACKER_SOCKET_PATH"
+    )
+    FIRECRACKER_KERNEL_PATH: str = Field(
+        default="/opt/firecracker/vmlinux.bin",
+        env="FIRECRACKER_KERNEL_PATH"
+    )
+    FIRECRACKER_ROOTFS_PATH: str = Field(
+        default="/opt/firecracker/rootfs.ext4",
+        env="FIRECRACKER_ROOTFS_PATH"
+    )
+    FIRECRACKER_VM_TIMEOUT_SECONDS: int = Field(
+        default=30,
+        env="FIRECRACKER_VM_TIMEOUT_SECONDS"
+    )
+    FIRECRACKER_MAX_MEMORY_MB: int = Field(
+        default=512,
+        env="FIRECRACKER_MAX_MEMORY_MB"
+    )
+    FIRECRACKER_VCPU_COUNT: int = Field(
+        default=2,
+        env="FIRECRACKER_VCPU_COUNT"
+    )
+    
+    # Code execution settings
+    MAX_CODE_LENGTH: int = Field(default=50000, env="MAX_CODE_LENGTH")  # 50KB max
+    MAX_EXECUTION_TIME_MS: int = Field(default=10000, env="MAX_EXECUTION_TIME_MS")  # 10 seconds
+    MAX_STDOUT_SIZE: int = Field(default=100000, env="MAX_STDOUT_SIZE")  # 100KB max stdout
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod

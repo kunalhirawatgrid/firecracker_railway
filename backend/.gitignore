@@ -33,6 +33,10 @@ ENV/
 # Allow .env.example to be committed
 !.env.example
 
+# JSON storage files
+storage/*.json
+!storage/.gitkeep
+
 # IDE
 .vscode/
 .idea/

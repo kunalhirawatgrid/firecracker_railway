@@ -1,0 +1,2 @@
+"""JSON storage models."""
+
