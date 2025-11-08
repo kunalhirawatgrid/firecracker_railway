@@ -13,10 +13,11 @@ class Settings(BaseSettings):
     VERSION: str = Field(default="1.0.0", env="VERSION")
     API_V1_STR: str = Field(default="/api/v1", env="API_V1_STR")
     
-    # CORS settings
+    # CORS settings - must be set in .env
     CORS_ORIGINS: Union[List[str], str] = Field(
-        default=["http://localhost:3000", "http://localhost:5173"],
-        env="CORS_ORIGINS"
+        default="",
+        env="CORS_ORIGINS",
+        description="Comma-separated list of allowed CORS origins"
     )
     
     # Server settings
@@ -29,8 +30,15 @@ class Settings(BaseSettings):
     def parse_cors_origins(cls, v: Union[str, List[str]]) -> List[str]:
         """Parse CORS origins from string or list."""
         if isinstance(v, str):
-            return [origin.strip() for origin in v.split(",") if origin.strip()]
-        return v
+            origins = [origin.strip() for origin in v.split(",") if origin.strip()]
+            if not origins:
+                raise ValueError("CORS_ORIGINS must be set in .env file")
+            return origins
+        if isinstance(v, list):
+            if not v:
+                raise ValueError("CORS_ORIGINS must be set in .env file")
+            return v
+        raise ValueError("CORS_ORIGINS must be set in .env file")
 
     class Config:
         """Pydantic config."""

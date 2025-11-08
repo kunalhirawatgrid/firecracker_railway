@@ -85,26 +85,37 @@ The frontend will be available at http://localhost:5173
 
 ## Environment Variables
 
+**Important:** All URLs and configuration values are stored in `.env` files. There are no hardcoded URLs in the codebase for production safety. Copy `.env.example` to `.env` and configure according to your environment.
+
 ### Backend (.env)
 
+See `backend/.env.example` for the complete configuration. Required variables:
+
 ```env
-PROJECT_NAME=Firecracker Railway API
-VERSION=1.0.0
-API_V1_STR=/api/v1
+# Required: CORS origins (comma-separated)
 CORS_ORIGINS=http://localhost:3000,http://localhost:5173
-HOST=0.0.0.0
-PORT=8000
-DEBUG=false
+
+# For production, use your actual frontend URL(s):
+# CORS_ORIGINS=https://yourdomain.com,https://www.yourdomain.com
 ```
+
+**Note:** `CORS_ORIGINS` is required and must be set in `.env`. The application will fail to start if it's not configured.
 
 ### Frontend (.env)
 
+See `frontend/.env.example` for the complete configuration. Required variables:
+
 ```env
+# Required in production, optional in development (has localhost default)
 VITE_API_BASE_URL=http://localhost:8000
-VITE_API_V1_STR=/api/v1
+
+# For production, use your actual backend URL:
+# VITE_API_BASE_URL=https://api.yourdomain.com
 ```
 
-**Note:** Frontend environment variables must be prefixed with `VITE_` to be accessible in the client-side code.
+**Note:** 
+- Frontend environment variables must be prefixed with `VITE_` to be accessible in the client-side code.
+- `VITE_API_BASE_URL` is required in production builds. In development, it defaults to `http://localhost:8000` if not set.
 
 ## Features
 

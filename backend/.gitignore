@@ -30,6 +30,8 @@ ENV/
 .env
 .env.local
 .env.*.local
+# Allow .env.example to be committed
+!.env.example
 
 # IDE
 .vscode/
