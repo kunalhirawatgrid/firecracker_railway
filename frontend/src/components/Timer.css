@@ -1,23 +1,38 @@
 .timer {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 0.75rem 1.5rem;
-  background: #2d2d30;
+  padding: 16px 24px;
+  background: white;
   border-radius: 8px;
-  border: 2px solid #3e3e42;
-  min-width: 150px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  text-align: center;
+  font-weight: bold;
+  transition: all 0.3s ease;
 }
 
-.timer.warning {
-  border-color: #f48771;
-  background: #3a1e1e;
+.timer-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #666;
+  margin-bottom: 4px;
+}
+
+.timer-value {
+  font-size: 32px;
+  font-family: 'Courier New', monospace;
+  font-weight: bold;
+}
+
+.timer.green .timer-value {
+  color: #22c55e;
+}
+
+.timer.orange .timer-value {
+  color: #f59e0b;
+}
+
+.timer.red .timer-value {
+  color: #ef4444;
   animation: pulse 1s infinite;
-}
-
-.timer.expired {
-  border-color: #f48771;
-  background: #5a1d1d;
 }
 
 @keyframes pulse {
@@ -27,36 +42,5 @@
   50% {
     opacity: 0.7;
   }
-}
-
-.timer-label {
-  font-size: 0.75rem;
-  color: #858585;
-  margin-bottom: 0.25rem;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.timer-display {
-  font-size: 1.5rem;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  color: #ffffff;
-  font-family: 'Courier New', monospace;
-}
-
-.timer.warning .timer-display {
-  color: #f48771;
-}
-
-.timer.expired .timer-display {
-  color: #f48771;
-}
-
-.timer-expired {
-  font-size: 0.75rem;
-  color: #f48771;
-  margin-top: 0.25rem;
-  font-weight: 600;
 }
 

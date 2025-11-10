@@ -1,41 +1,51 @@
-/**
- * Assessment API client.
- */
-import api from './api';
+import api from './api'
 
-export const assessmentApi = {
-  /**
-   * Create a new assessment.
-   */
-  createAssessment: (data) => api.post('/assessments', data),
+export const getAssessment = async (assessmentId) => {
+  const response = await api.get(`/assessments/${assessmentId}`)
+  return response.data
+}
 
-  /**
-   * Get assessment by ID.
-   */
-  getAssessment: (assessmentId, candidateId) =>
-    api.get(`/assessments/${assessmentId}?candidate_id=${candidateId}`),
+export const getAllAssessments = async () => {
+  const response = await api.get('/assessments')
+  return response.data
+}
 
-  /**
-   * Start an assessment.
-   */
-  startAssessment: (assessmentId, candidateId) =>
-    api.post(`/assessments/${assessmentId}/start`, { candidate_id: candidateId }),
+export const executeCode = async (code, language, input = null) => {
+  const response = await api.post('/execute', {
+    code,
+    language,
+    input,
+  })
+  return response.data
+}
 
-  /**
-   * Get questions for an assessment.
-   */
-  getQuestions: (assessmentId, candidateId) =>
-    api.get(`/assessments/${assessmentId}/questions?candidate_id=${candidateId}`),
+export const executeWithTests = async (
+  code,
+  language,
+  questionId,
+  assessmentId,
+  candidateId = 'anonymous',
+  includeHidden = false
+) => {
+  const response = await api.post('/execute/test', {
+    code,
+    language,
+    question_id: questionId,
+    assessment_id: assessmentId,
+    candidate_id: candidateId,
+    include_hidden: includeHidden,
+  })
+  return response.data
+}
 
-  /**
-   * Submit a solution.
-   */
-  submitSolution: (assessmentId, questionId, candidateId, data) =>
-    api.post(`/assessments/${assessmentId}/questions/${questionId}/submit?candidate_id=${candidateId}`, data),
-
-  /**
-   * Execute code (for testing).
-   */
-  executeCode: (data) => api.post('/execute/run', data),
-};
+export const getSubmissions = async (assessmentId, questionId, candidateId) => {
+  const response = await api.get('/execute/submissions', {
+    params: {
+      assessment_id: assessmentId,
+      question_id: questionId,
+      candidate_id: candidateId,
+    },
+  })
+  return response.data
+}
 

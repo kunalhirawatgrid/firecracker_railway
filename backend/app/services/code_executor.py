@@ -1,132 +1,111 @@
-"""
-Code execution service that uses Firecracker VM.
-"""
-from typing import Dict, List, Optional
-from app.services.firecracker import FirecrackerVM
-from app.models.json_models import TestCase, TestResult
-from app.db.session import JSONSession
+from typing import List, Tuple, Optional
+from app.models.assessment import (
+    Language,
+    TestCase,
+    TestCaseType,
+    TestResult,
+    ExecutionResult,
+)
+from app.services.gvisor_executor import executor
+from app.db.json_storage import storage
+from app.models.assessment import Question
 
 
-class CodeExecutor:
-    """Code execution service."""
-
-    def __init__(self):
-        """Initialize code executor."""
-        self.vm = FirecrackerVM()
-
-    async def run_tests(
+class CodeExecutorService:
+    """Service for executing code and running test cases"""
+    
+    def execute_code(
         self,
         code: str,
-        language: str,
-        test_cases: List[TestCase],
-        submission_id: int,
-        db: JSONSession,
-        show_hidden: bool = False
-    ) -> Dict:
+        language: Language,
+        input_data: Optional[str] = None,
+    ) -> ExecutionResult:
+        """Execute code with optional input"""
+        return executor.execute(code, language, input_data)
+    
+    def run_test_cases(
+        self,
+        code: str,
+        language: Language,
+        question_id: str,
+        include_hidden: bool = False,
+    ) -> Tuple[List[TestResult], str]:
         """
-        Run code against test cases.
-        
-        Args:
-            code: Source code to test
-            language: Programming language
-            test_cases: List of test cases to run
-            submission_id: Submission ID
-            db: Database session
-            show_hidden: Whether to show hidden test case results
-            
-        Returns:
-            Dictionary with test results
+        Run test cases for a question
+        Returns: (test_results, compilation_logs)
         """
-        # Filter test cases based on visibility
-        visible_cases = [tc for tc in test_cases if tc.is_sample or show_hidden]
+        # Get question from storage
+        assessments = storage.get_all_assessments()
+        question = None
+        for assessment in assessments:
+            for q in assessment.questions:
+                if q.id == question_id:
+                    question = q
+                    break
+            if question:
+                break
         
-        results = []
-        passed_count = 0
-        total_count = len(visible_cases)
+        if not question:
+            raise ValueError(f"Question {question_id} not found")
         
-        for test_case in visible_cases:
-            # Execute code with test case input
-            execution_result = await self.vm.execute_code(
+        # Check if language is allowed
+        if language not in question.allowed_languages:
+            raise ValueError(f"Language {language.value} not allowed for this question")
+        
+        test_results = []
+        compilation_logs = ""
+        
+        # Run sample test cases
+        for test_case in question.sample_test_cases:
+            passed, actual_output, error, exec_time = executor.execute_with_test_case(
                 code=code,
                 language=language,
-                input_data=test_case.input_data,
-                timeout_seconds=10
+                input_data=test_case.input,
+                expected_output=test_case.expected_output,
             )
             
-            # Compare output
-            actual_output = execution_result.get("stdout", "").strip()
-            expected_output = test_case.expected_output.strip()
-            passed = actual_output == expected_output
+            # Collect compilation errors
+            if error and "error" in error.lower():
+                compilation_logs += f"Test {test_case.id}: {error}\n"
             
-            if passed:
-                passed_count += 1
-            
-            # Create test result record
-            error_message = execution_result.get("stderr") if not execution_result.get("success") else None
-            execution_time = execution_result.get("execution_time_ms", 0)
-            
-            test_result_dict = {
-                "submission_id": submission_id,
-                "test_case_id": test_case.id,
-                "passed": passed,
-                "actual_output": actual_output if (test_case.is_sample or show_hidden) else None,
-                "error_message": error_message,
-                "execution_time_ms": execution_time,
-            }
-            db.storage.create("test_results", test_result_dict)
-            
-            results.append({
-                "test_case_id": test_case.id,
-                "is_sample": test_case.is_sample,
-                "passed": passed,
-                "actual_output": actual_output if (test_case.is_sample or show_hidden) else None,
-                "expected_output": expected_output if test_case.is_sample else None,
-                "error": error_message,
-                "execution_time_ms": execution_time,
-            })
+            test_result = TestResult(
+                test_case_id=test_case.id,
+                passed=passed,
+                input=test_case.input,
+                expected_output=test_case.expected_output,
+                actual_output=actual_output,
+                error=error,
+                execution_time=exec_time,
+            )
+            test_results.append(test_result)
         
-        # Collect compilation and execution logs from all test runs
-        all_stderr = []
-        all_stdout = []
+        # Run hidden test cases if requested
+        if include_hidden:
+            for test_case in question.hidden_test_cases:
+                passed, actual_output, error, exec_time = executor.execute_with_test_case(
+                    code=code,
+                    language=language,
+                    input_data=test_case.input,
+                    expected_output=test_case.expected_output,
+                )
+                
+                if error and "error" in error.lower():
+                    compilation_logs += f"Test {test_case.id}: {error}\n"
+                
+                test_result = TestResult(
+                    test_case_id=test_case.id,
+                    passed=passed,
+                    input=test_case.input,
+                    expected_output=test_case.expected_output,
+                    actual_output=actual_output,
+                    error=error,
+                    execution_time=exec_time,
+                )
+                test_results.append(test_result)
         
-        # Get logs from the last execution (most recent)
-        if execution_result:
-            if execution_result.get("stderr"):
-                all_stderr.append(execution_result.get("stderr"))
-            if execution_result.get("stdout"):
-                all_stdout.append(execution_result.get("stdout"))
-        
-        compilation_logs = "\n".join(all_stderr) if all_stderr else ""
-        execution_logs = "\n".join(all_stdout) if all_stdout else ""
-        
-        return {
-            "passed": passed_count,
-            "total": total_count,
-            "results": results,
-            "compilation_logs": compilation_logs,
-            "execution_logs": execution_logs,
-        }
+        return test_results, compilation_logs.strip()
 
-    async def execute_code(
-        self,
-        code: str,
-        language: str,
-        input_data: Optional[str] = None
-    ) -> Dict:
-        """
-        Execute code and return results.
-        
-        Args:
-            code: Source code
-            language: Programming language
-            input_data: Optional input data
-            
-        Returns:
-            Execution results
-        """
-        return await self.vm.execute_code(
-            code=code,
-            language=language,
-            input_data=input_data
-        )
+
+# Global service instance
+code_executor_service = CodeExecutorService()
 

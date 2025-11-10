@@ -1,64 +1,56 @@
-import { useState, useEffect } from 'react';
-import './Timer.css';
+import React, { useState, useEffect } from 'react'
+import './Timer.css'
 
-const Timer = ({ expiresAt, onExpire }) => {
-  const [timeRemaining, setTimeRemaining] = useState(null);
-  const [isExpired, setIsExpired] = useState(false);
+const Timer = ({ duration, onTimeUp, isActive = true }) => {
+  const [timeLeft, setTimeLeft] = useState(duration * 60) // Convert minutes to seconds
 
   useEffect(() => {
-    if (!expiresAt) {
-      setTimeRemaining({ hours: 0, minutes: 0, seconds: 0 });
-      return;
+    if (!isActive || timeLeft <= 0) {
+      if (timeLeft <= 0 && onTimeUp) {
+        onTimeUp()
+      }
+      return
     }
 
-    const updateTimer = () => {
-      const now = new Date();
-      // Handle ISO string with or without timezone
-      const expiryStr = expiresAt.includes('Z') ? expiresAt : expiresAt + 'Z';
-      const expiry = new Date(expiryStr);
-      const diff = expiry - now;
-
-      if (diff <= 0) {
-        setIsExpired(true);
-        setTimeRemaining({ hours: 0, minutes: 0, seconds: 0 });
-        if (onExpire) {
-          onExpire();
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          if (onTimeUp) {
+            onTimeUp()
+          }
+          return 0
         }
-        return;
-      }
+        return prev - 1
+      })
+    }, 1000)
 
-      const hours = Math.floor(diff / (1000 * 60 * 60));
-      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+    return () => clearInterval(timer)
+  }, [timeLeft, isActive, onTimeUp])
 
-      setTimeRemaining({ hours, minutes, seconds });
-    };
+  const formatTime = (seconds) => {
+    const hours = Math.floor(seconds / 3600)
+    const minutes = Math.floor((seconds % 3600) / 60)
+    const secs = seconds % 60
 
-    updateTimer();
-    const interval = setInterval(updateTimer, 1000);
-
-    return () => clearInterval(interval);
-  }, [expiresAt, onExpire]);
-
-  if (!timeRemaining) {
-    return <div className="timer">Loading...</div>;
+    if (hours > 0) {
+      return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
+    }
+    return `${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
   }
 
-  const { hours, minutes, seconds } = timeRemaining;
-  const isWarning = hours === 0 && minutes < 5;
+  const getTimeColor = () => {
+    if (timeLeft <= 300) return 'red' // Less than 5 minutes
+    if (timeLeft <= 900) return 'orange' // Less than 15 minutes
+    return 'green'
+  }
 
   return (
-    <div className={`timer ${isExpired ? 'expired' : ''} ${isWarning ? 'warning' : ''}`}>
+    <div className={`timer ${getTimeColor()}`}>
       <div className="timer-label">Time Remaining</div>
-      <div className="timer-display">
-        {String(hours).padStart(2, '0')}:
-        {String(minutes).padStart(2, '0')}:
-        {String(seconds).padStart(2, '0')}
-      </div>
-      {isExpired && <div className="timer-expired">Time's Up!</div>}
+      <div className="timer-value">{formatTime(timeLeft)}</div>
     </div>
-  );
-};
+  )
+}
 
-export default Timer;
+export default Timer
 

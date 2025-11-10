@@ -1,130 +1,95 @@
-"""
-JSON-based in-memory storage for development/testing.
-"""
 import json
 import os
+from typing import Dict, List, Optional
 from pathlib import Path
-from typing import Dict, List, Optional, Any
-from datetime import datetime
-import threading
-
-STORAGE_DIR = Path(__file__).parent.parent.parent / "storage"
-STORAGE_DIR.mkdir(exist_ok=True)
-
-# Thread lock for concurrent access
-_lock = threading.Lock()
+from app.models.assessment import Assessment, Submission
+from app.core.config import settings
 
 
 class JSONStorage:
-    """JSON-based storage implementation."""
-
-    def __init__(self, filename: str = "data.json"):
-        """Initialize JSON storage."""
-        self.filename = STORAGE_DIR / filename
-        self._data: Dict[str, List[Dict]] = {}
-        self._load()
-
-    def _load(self):
-        """Load data from JSON file."""
-        if self.filename.exists():
-            try:
-                with open(self.filename, "r") as f:
-                    self._data = json.load(f)
-            except (json.JSONDecodeError, IOError):
-                self._data = {}
-        else:
-            self._data = {}
-
-    def _save(self):
-        """Save data to JSON file."""
-        with _lock:
-            with open(self.filename, "w") as f:
-                json.dump(self._data, f, indent=2, default=str)
-
-    def _get_table(self, table_name: str) -> List[Dict]:
-        """Get table data."""
-        if table_name not in self._data:
-            self._data[table_name] = []
-        return self._data[table_name]
-
-    def _get_next_id(self, table_name: str) -> int:
-        """Get next ID for a table."""
-        table = self._get_table(table_name)
-        if not table:
-            return 1
-        return max(item.get("id", 0) for item in table) + 1
-
-    def create(self, table_name: str, data: Dict) -> Dict:
-        """Create a new record."""
-        table = self._get_table(table_name)
-        record = data.copy()
-        record["id"] = self._get_next_id(table_name)
-        record["created_at"] = datetime.utcnow().isoformat()
-        record["updated_at"] = datetime.utcnow().isoformat()
-        table.append(record)
-        self._save()
-        return record
-
-    def get(self, table_name: str, record_id: int) -> Optional[Dict]:
-        """Get a record by ID."""
-        table = self._get_table(table_name)
-        for record in table:
-            if record.get("id") == record_id:
-                return record
+    def __init__(self, storage_path: str = None):
+        self.storage_path = Path(storage_path or settings.storage_path)
+        self.storage_path.mkdir(parents=True, exist_ok=True)
+        self.assessments_file = self.storage_path / "assessments.json"
+        self.submissions_file = self.storage_path / "submissions.json"
+        self._ensure_files_exist()
+    
+    def _ensure_files_exist(self):
+        """Create JSON files if they don't exist"""
+        if not self.assessments_file.exists():
+            self.assessments_file.write_text(json.dumps([], indent=2))
+        if not self.submissions_file.exists():
+            self.submissions_file.write_text(json.dumps([], indent=2))
+    
+    def _read_json(self, file_path: Path) -> List[Dict]:
+        """Read and parse JSON file"""
+        try:
+            content = file_path.read_text()
+            return json.loads(content) if content.strip() else []
+        except (json.JSONDecodeError, FileNotFoundError):
+            return []
+    
+    def _write_json(self, file_path: Path, data: List[Dict]):
+        """Write data to JSON file"""
+        file_path.write_text(json.dumps(data, indent=2, default=str))
+    
+    # Assessment methods
+    def get_assessment(self, assessment_id: str) -> Optional[Assessment]:
+        """Get assessment by ID"""
+        assessments = self._read_json(self.assessments_file)
+        for assessment_data in assessments:
+            if assessment_data.get("id") == assessment_id:
+                return Assessment.from_dict(assessment_data)
         return None
-
-    def get_all(self, table_name: str, filters: Optional[Dict] = None) -> List[Dict]:
-        """Get all records, optionally filtered."""
-        table = self._get_table(table_name)
-        if not filters:
-            return table.copy()
-
-        result = []
-        for record in table:
-            match = True
-            for key, value in filters.items():
-                if record.get(key) != value:
-                    match = False
-                    break
-            if match:
-                result.append(record)
-        return result
-
-    def update(self, table_name: str, record_id: int, data: Dict) -> Optional[Dict]:
-        """Update a record."""
-        table = self._get_table(table_name)
-        for i, record in enumerate(table):
-            if record.get("id") == record_id:
-                updated = record.copy()
-                updated.update(data)
-                updated["updated_at"] = datetime.utcnow().isoformat()
-                updated["id"] = record_id  # Preserve ID
-                table[i] = updated
-                self._save()
-                return updated
+    
+    def get_all_assessments(self) -> List[Assessment]:
+        """Get all assessments"""
+        assessments = self._read_json(self.assessments_file)
+        return [Assessment.from_dict(a) for a in assessments]
+    
+    def create_assessment(self, assessment: Assessment) -> Assessment:
+        """Create a new assessment"""
+        assessments = self._read_json(self.assessments_file)
+        assessments.append(assessment.to_dict())
+        self._write_json(self.assessments_file, assessments)
+        return assessment
+    
+    def update_assessment(self, assessment: Assessment) -> Optional[Assessment]:
+        """Update an existing assessment"""
+        assessments = self._read_json(self.assessments_file)
+        for i, assessment_data in enumerate(assessments):
+            if assessment_data.get("id") == assessment.id:
+                assessments[i] = assessment.to_dict()
+                self._write_json(self.assessments_file, assessments)
+                return assessment
         return None
-
-    def delete(self, table_name: str, record_id: int) -> bool:
-        """Delete a record."""
-        table = self._get_table(table_name)
-        for i, record in enumerate(table):
-            if record.get("id") == record_id:
-                table.pop(i)
-                self._save()
-                return True
-        return False
-
-    def query(self, table_name: str, **filters) -> List[Dict]:
-        """Query records with multiple filters."""
-        return self.get_all(table_name, filters if filters else None)
-
-    def clear(self, table_name: Optional[str] = None):
-        """Clear all data or a specific table."""
-        if table_name:
-            self._data[table_name] = []
-        else:
-            self._data = {}
-        self._save()
+    
+    # Submission methods
+    def create_submission(self, submission: Submission) -> Submission:
+        """Create a new submission"""
+        submissions = self._read_json(self.submissions_file)
+        submissions.append(submission.to_dict())
+        self._write_json(self.submissions_file, submissions)
+        return submission
+    
+    def get_submissions(
+        self,
+        assessment_id: Optional[str] = None,
+        question_id: Optional[str] = None,
+        candidate_id: Optional[str] = None,
+    ) -> List[Submission]:
+        """Get submissions with optional filters"""
+        submissions_data = self._read_json(self.submissions_file)
+        submissions = [Submission.from_dict(s) for s in submissions_data]
+        
+        if assessment_id:
+            submissions = [s for s in submissions if s.assessment_id == assessment_id]
+        if question_id:
+            submissions = [s for s in submissions if s.question_id == question_id]
+        if candidate_id:
+            submissions = [s for s in submissions if s.candidate_id == candidate_id]
+        
+        return submissions
 
 
 # Global storage instance
