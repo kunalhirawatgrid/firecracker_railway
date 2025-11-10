@@ -9,10 +9,10 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# CORS middleware
+# CORS middleware - use environment variable for allowed origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify actual origins
+    allow_origins=settings.allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -36,7 +36,7 @@ if __name__ == "__main__":
     uvicorn.run(
         "main:app",
         host=settings.host,
-        port=settings.port,
+        port=settings.actual_port,  # Use actual_port to respect PORT env var
         reload=settings.debug,
     )
 
