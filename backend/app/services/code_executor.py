@@ -1,4 +1,5 @@
 from typing import List, Tuple, Optional
+import subprocess
 from app.models.assessment import (
     Language,
     TestCase,
@@ -6,13 +7,20 @@ from app.models.assessment import (
     TestResult,
     ExecutionResult,
 )
-from app.services.gvisor_executor import executor
+from app.services.pyston_executor import executor as pyston_executor
+from app.services.direct_executor import direct_executor
 from app.db.json_storage import storage
 from app.models.assessment import Question
 
 
 class CodeExecutorService:
     """Service for executing code and running test cases"""
+    
+    def _get_executor(self):
+        """Get the appropriate executor based on availability"""
+        # Use Pyston executor (Piston API) as primary executor
+        # It works in any environment without Docker/gVisor setup
+        return pyston_executor
     
     def execute_code(
         self,
@@ -21,6 +29,7 @@ class CodeExecutorService:
         input_data: Optional[str] = None,
     ) -> ExecutionResult:
         """Execute code with optional input"""
+        executor = self._get_executor()
         return executor.execute(code, language, input_data)
     
     def run_test_cases(
@@ -54,6 +63,9 @@ class CodeExecutorService:
         
         test_results = []
         compilation_logs = ""
+        
+        # Get executor
+        executor = self._get_executor()
         
         # Run sample test cases
         for test_case in question.sample_test_cases:
